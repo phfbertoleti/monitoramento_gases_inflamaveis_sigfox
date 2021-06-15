@@ -10,7 +10,7 @@ Este projeto utiliza os seguinte componentes e placas:
 * Placa Arduino Nano
 * Sensor MQ-2
 * Sensor DHT11
-* Resistor de 100k / 0.25W
+* Resistor de 10k / 0.25W
 * Protoboard de 400 pontos
 * Jumpers diversos
 
