@@ -1,5 +1,5 @@
 /* Programa: monitoramento de temperatura ambiente
- *           e gases inflamáveis/fumaça via SigFox
+ *           e umidade relativa do ar via SigFox
  * Autor: Pedro Bertoleti
  */
 #include <SoftwareSerial.h>
@@ -59,6 +59,7 @@ void hardware_reset_HT32SX(void);
 void envia_comando_AT_HT32SX(char * pt_comando);
 unsigned long diferenca_tempo(unsigned long tref);
 void aguarda_e_mostra_recepcao_HT32SX(void);
+void envia_mensagem_sigfox(void);
 
 /* Função: reseta (via hardware) o HT32SX 
  * Parâmetros: nenhum
@@ -116,12 +117,46 @@ void aguarda_e_mostra_recepcao_HT32SX(void)
     }  
 }
 
+/* Função: envia mensagem via SigFox
+ * Parâmetros: nenhum
+ * Retorno: nenhum
+ */
+void envia_mensagem_sigfox(void)
+{
+    /* Acorda HT32SX, faz a configuração da zona de comunicação 
+       e envia mensagem SigFox */
+    envia_comando_AT_HT32SX(CMD_AT_HT32SX_SAI_DEEP_SLEEP);
+    aguarda_e_mostra_recepcao_HT32SX();
+    hardware_reset_HT32SX();
+    aguarda_e_mostra_recepcao_HT32SX();
+    envia_comando_AT_HT32SX(CMD_AT_HT32SX_RCZ2);    
+    aguarda_e_mostra_recepcao_HT32SX();
+
+    /* Formata e envia comando AT */
+    memset(comando_at_envio_sigfox, 0x00, sizeof(comando_at_envio_sigfox));
+    sprintf(comando_at_envio_sigfox, "%s%02x%02x;", CMD_AT_HT32SX_MANDA_BYTES, 
+                                                    (unsigned char)temperatura,
+                                                    (unsigned char)sensor_gas);
+
+    #ifdef ESCREVE_DEBUG_SENSORES
+    Serial.print("Comando AT: ");
+    Serial.println(comando_at_envio_sigfox);
+    #endif
+        
+    envia_comando_AT_HT32SX(comando_at_envio_sigfox);
+    aguarda_e_mostra_recepcao_HT32SX();
+        
+    /* HT32SX entra em modo sleep novamente */
+    envia_comando_AT_HT32SX(CMD_AT_HT32SX_ENTRA_DEEP_SLEEP);
+    aguarda_e_mostra_recepcao_HT32SX();
+}
+
 void setup() 
 {
     /* Inicializa as comunicações seriais */
     Serial.begin(BAUDRATE_SERIAL_DEBUG);
     serial_HT32SX.begin(BAUDRATE_SERIAL_HT32SX);
-    Serial.println("SigFox - monitor de temperatura e gases inflamaveis");
+    Serial.println("SigFox - monitor de temperatura e umidade");
     Serial.println("Aguarde 8 segundos...");
 
     /* Inicializa GPIOs */
@@ -140,7 +175,7 @@ void setup()
     envia_comando_AT_HT32SX(CMD_AT_HT32SX_ENTRA_DEEP_SLEEP);
     
     /* Inicializa temporização da medição de: 
-     * - Sensores (temperatura e gases inflamaveis)
+     * - Temperatura e umidade 
      * - Envio SigFox 
      * - Breathing light
     */
@@ -187,9 +222,15 @@ void loop()
             temperatura = (int)dht.readTemperature();
         }while( (isnan(temperatura)) || (temperatura <= 0) );
 
-        /* Le sensor de gás MQ-2 */
+        /* Le sensor de gás MQ-2.
+           Se houver gás inflamável detectado, força o envio
+           de uma mensagem. */
         if (digitalRead(GPIO_MQ2) == HIGH)
+        {
             sensor_gas = GAS_INFLAMAVEL_DETECTADO;
+            envia_mensagem_sigfox();  
+            timestamp_envio_sigfox = millis();          
+        }
         else
             sensor_gas = GAS_INFLAMAVEL_NAO_DETECTADO;    
 
@@ -199,7 +240,10 @@ void loop()
         Serial.println("C");
 
         if (sensor_gas == GAS_INFLAMAVEL_DETECTADO)
+        {
             Serial.println("Gas inflamavel: detectado!");
+            Serial.println("Mensagem indicando o alarme foi enviada");            
+        }
         else
             Serial.println("Gas inflamavel: nada detectado");    
             
@@ -212,33 +256,7 @@ void loop()
     /* Verifica se é o momento de enviar medições via SigFox */
     if (diferenca_tempo(timestamp_envio_sigfox) >= TEMPO_ENTRE_ENVIOS_SIGFOX)
     {
-        /* Acorda HT32SX, faz a configuração da zona de comunicação 
-           e envia mensagem SigFox */
-        envia_comando_AT_HT32SX(CMD_AT_HT32SX_SAI_DEEP_SLEEP);
-        aguarda_e_mostra_recepcao_HT32SX();
-        hardware_reset_HT32SX();
-        aguarda_e_mostra_recepcao_HT32SX();
-        envia_comando_AT_HT32SX(CMD_AT_HT32SX_RCZ2);    
-        aguarda_e_mostra_recepcao_HT32SX();
-
-        /* Formata e envia comando AT */
-        memset(comando_at_envio_sigfox, 0x00, sizeof(comando_at_envio_sigfox));
-        sprintf(comando_at_envio_sigfox, "%s%02x%02x;", CMD_AT_HT32SX_MANDA_BYTES, 
-                                                        (unsigned char)temperatura,
-                                                        (unsigned char)sensor_gas);
-
-        #ifdef ESCREVE_DEBUG_SENSORES
-        Serial.print("Comando AT: ");
-        Serial.println(comando_at_envio_sigfox);
-        #endif
-        
-        envia_comando_AT_HT32SX(comando_at_envio_sigfox);
-        aguarda_e_mostra_recepcao_HT32SX();
-        
-        /* Entra em modo sleep novamente */
-        envia_comando_AT_HT32SX(CMD_AT_HT32SX_ENTRA_DEEP_SLEEP);
-        aguarda_e_mostra_recepcao_HT32SX();
-        
+        envia_mensagem_sigfox();
         timestamp_envio_sigfox = millis();
     }
 }
