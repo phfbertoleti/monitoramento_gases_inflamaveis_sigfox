@@ -53,6 +53,7 @@ int temperatura = 0;
 char sensor_gas = GAS_INFLAMAVEL_NAO_DETECTADO;
 bool led_aceso = false;
 char comando_at_envio_sigfox[20] = {0};
+bool alarme_gases_inflamaveis_enviado = false;
 
 /* Protótipos */
 void hardware_reset_HT32SX(void);
@@ -228,11 +229,19 @@ void loop()
         if (digitalRead(GPIO_MQ2) == HIGH)
         {
             sensor_gas = GAS_INFLAMAVEL_DETECTADO;
-            envia_mensagem_sigfox();  
-            timestamp_envio_sigfox = millis();          
+
+            if (alarme_gases_inflamaveis_enviado == false)
+            {
+                envia_mensagem_sigfox();  
+                alarme_gases_inflamaveis_enviado = true;
+                timestamp_envio_sigfox = millis();          
+            }
         }
         else
+        {
             sensor_gas = GAS_INFLAMAVEL_NAO_DETECTADO;    
+            alarme_gases_inflamaveis_enviado = false;
+        }
 
         #ifdef ESCREVE_DEBUG_SENSORES
         Serial.print("Temperatura ambiente: ");
@@ -242,7 +251,6 @@ void loop()
         if (sensor_gas == GAS_INFLAMAVEL_DETECTADO)
         {
             Serial.println("Gas inflamavel: detectado!");
-            Serial.println("Mensagem indicando o alarme foi enviada");            
         }
         else
             Serial.println("Gas inflamavel: nada detectado");    
