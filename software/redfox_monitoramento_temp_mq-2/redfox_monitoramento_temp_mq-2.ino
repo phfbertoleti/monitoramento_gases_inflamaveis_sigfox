@@ -11,10 +11,13 @@
 #define GPIO_MQ2                      6
 #define GAS_INFLAMAVEL_NAO_DETECTADO  0x00
 #define GAS_INFLAMAVEL_DETECTADO      0x01
-//#define ESCREVE_DEBUG_SENSORES
+#define ESCREVE_DEBUG_SENSORES
 
 /* Definição - breathing light */
 #define TEMPO_BREATHING_LIGHT     500 //ms
+
+/* Definição - burn-in time do MQ-2 */
+#define TEMPO_BURNIN_MQ2          180 //s (3 minutos)
 
 /* Definições - comandos AT para o HT32SX */
 #define CMD_AT_HT32SX_RESET            "AT+RESET;"
@@ -154,11 +157,13 @@ void envia_mensagem_sigfox(void)
 
 void setup() 
 {
+    int contador_segundos_burnin_mq2;
+    
     /* Inicializa as comunicações seriais */
     Serial.begin(BAUDRATE_SERIAL_DEBUG);
     serial_HT32SX.begin(BAUDRATE_SERIAL_HT32SX);
     Serial.println("SigFox - monitor de temperatura e umidade");
-    Serial.println("Aguarde 8 segundos...");
+    Serial.println("Aguarde 3 minutos para o burn-in time do sensor MQ-2...");
 
     /* Inicializa GPIOs */
     pinMode(RESET, OUTPUT);
@@ -174,6 +179,16 @@ void setup()
     hardware_reset_HT32SX();
     delay(8000);
     envia_comando_AT_HT32SX(CMD_AT_HT32SX_ENTRA_DEEP_SLEEP);
+
+    contador_segundos_burnin_mq2 = 0;
+    while (contador_segundos_burnin_mq2 < TEMPO_BURNIN_MQ2)
+    {
+        Serial.print("Tempo restante: ");
+        Serial.print(TEMPO_BURNIN_MQ2 - contador_segundos_burnin_mq2);
+        Serial.println("s");
+        contador_segundos_burnin_mq2++;
+        delay(1000);
+    }
     
     /* Inicializa temporização da medição de: 
      * - Temperatura e umidade 
