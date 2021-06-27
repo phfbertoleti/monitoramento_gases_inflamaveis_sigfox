@@ -202,8 +202,7 @@ void setup()
 
 void loop() 
 {
-    char c;        
-    unsigned char tensao_byte;
+    char c;
     
     /* Escreve mensagens recebidas da UART com o HT32SX */
     if (serial_HT32SX.available()) 
