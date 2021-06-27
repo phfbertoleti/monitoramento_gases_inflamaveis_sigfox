@@ -1,5 +1,5 @@
-/* Programa: monitoramento de temperatura ambiente
- *           e umidade relativa do ar via SigFox
+/* Programa: monitoramento de temperatura ambiente e 
+ *           gases inflamáveis via SigFox
  * Autor: Pedro Bertoleti
  */
 #include <SoftwareSerial.h>
